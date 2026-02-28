@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         "service.starting",
         version=settings.app_version,
         environment=settings.environment,
+        bootstrap_servers=settings.redpanda_bootstrap_servers,
     )
 
     storage = LocalFileStorage(base_path=settings.storage_base_path)
@@ -34,7 +35,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     publisher = RedpandaEventPublisher(
         bootstrap_servers=settings.redpanda_bootstrap_servers
     )
-    await publisher.start()
+
+    try:
+        await publisher.start()
+    except Exception as exc:
+        logger.critical(
+            "service.startup.failed",
+            component="kafka_producer",
+            error=str(exc),
+        )
+        raise
 
     app.state.storage = storage
     app.state.repository = repository
@@ -50,7 +60,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="Ingestion Service",
-    description="Accepts document uploads, validates, stores, and emits document.uploaded events.",
+    description="Accepts document uploads, validates, stores, and emits docs.uploaded events.",
     version=settings.app_version,
     lifespan=lifespan,
 )

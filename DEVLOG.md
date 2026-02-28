@@ -4,6 +4,34 @@ Automatyczne dzienne podsumowania pracy z projektów.
 
 ---
 
+## 📅 2026-02-28 — Dzienne podsumowanie
+
+### ✅ Co zostało zrobione
+- Wzbogacono modele zdarzeń Kafka w `shared/events/document_events.py` o pole `event_type` jako discriminator (`Literal["document.uploaded"]` itd.) z wartością domyślną
+- Dodano pola czasowe `uploaded_at` (dla `DocumentUploadedEvent`) i `indexed_at` (dla `DocumentIndexedEvent`) z `default_factory=datetime.now(timezone.utc)`
+- Wszystkie pola opatrzono opisem przez `Field(description=...)` — czytelna dokumentacja kontraktu zdarzenia
+- Dodano rozbudowane docstringi z przykładowym payloadem JSON dla każdej z 3 klas: `DocumentUploadedEvent`, `DocumentIndexedEvent`, `DocumentIndexingFailedEvent`
+- Zrefaktoryzowano `ingestion_service/infrastructure/producer.py`: zmieniono temat na `docs.uploaded` (stała `_TOPIC`), dodano obsługę błędów `KafkaError` w `start()`, `stop()` i `publish_document_uploaded()`
+- W `publish_document_uploaded()` dodano `logger.bind(correlation_id=...)` — każdy log emisji zdarzenia zawiera `correlation_id`, `topic`, `event_id`, `document_id`
+- Zaktualizowano `ingestion_service/main.py`: blok `try/except` wokół `publisher.start()` z logiem `service.startup.failed` (komponent `kafka_producer`), dodano `bootstrap_servers` do logu startowego
+
+### 🔧 Technologie / narzędzia użyte
+- **Pydantic v2** — `Literal`, `Field(description=...)`, `default_factory` dla pól czasowych
+- **aiokafka** — `AIOKafkaProducer`, obsługa `KafkaError` z jawnym re-raise
+- **structlog** — `logger.bind()` do wiązania `correlation_id` z logami emisji zdarzeń
+- **Python `typing.Literal`** — discriminator field dla type narrowing przy deserializacji
+
+### 🐛 Napotkane problemy i rozwiązania
+- Poprzedni producer używał `event.topic` jako nazwy topicu (zwracał `"document.uploaded"`), co było niezgodne z wymaganiem `docs.uploaded` — naprawiono przez wprowadzenie stałej `_TOPIC = "docs.uploaded"` i użycie jej bezpośrednio w `send_and_wait`
+- Brak jawnej obsługi błędów w `stop()` mógł zamaskować wyjątek przy wyłączaniu serwisu — dodano `try/except/finally` z gwarantowanym logiem `producer.stopped`
+
+### 📁 Zmienione pliki
+- `shared/events/document_events.py` — dodano `event_type` Literal, `uploaded_at`/`indexed_at`, `Field(description=...)`, docstringi z przykładami payloadów
+- `services/ingestion_service/src/ingestion_service/infrastructure/producer.py` — stała `_TOPIC`, obsługa `KafkaError`, `logger.bind` z `correlation_id`
+- `services/ingestion_service/src/ingestion_service/main.py` — `try/except` wokół `publisher.start()`, rozszerzony log startowy
+
+---
+
 ## 📅 2026-02-27 — Dzienne podsumowanie (aktualizacja)
 
 ### ✅ Co zostało zrobione
